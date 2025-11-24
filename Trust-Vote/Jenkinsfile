@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+
+    environment {
+        // change this to your college nexus docker registry + repo
+        DOCKER_IMAGE = "nexus.yourcollege.ac.in/trustvote-frontend:${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build frontend (npm)') {
+            steps {
+                dir('Trust-Vote/Trust-Vote/client') {
+                    sh 'npm install'
+                    sh 'npm run build'
+                }
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                dir('Trust-Vote/Trust-Vote/client') {
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                }
+            }
+        }
+
+        stage('Push image to Nexus') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-docker-creds',  // create this id in Jenkins
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh "echo $DOCKER_PASS | docker login nexus.yourcollege.ac.in -u $DOCKER_USER --password-stdin"
+                    sh "docker push ${DOCKER_IMAGE}"
+                }
+            }
+        }
+
+        // Optional: simple deploy by running container on same server
+        stage('Deploy container') {
+            steps {
+                sh """
+                  docker rm -f trustvote-frontend || true
+                  docker run -d --name trustvote-frontend -p 3000:5000 ${DOCKER_IMAGE}
+                """
+            }
+        }
+    }
+}

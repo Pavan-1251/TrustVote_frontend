@@ -1,0 +1,136 @@
+===========================
+GIT PROJECT WORKFLOW GUIDE
+===========================
+
+Use this as your personal reference for adding, updating, and pushing projects to GitHub.
+
+----------------------------------------
+1. INITIAL SETUP (One Time per Project)
+----------------------------------------
+
+# Create a GitHub repo from website
+# Example: https://github.com/username/Trust-Vote
+
+1. Open terminal and navigate to your project folder
+   cd path/to/your/project
+
+2. Initialize Git
+   git init
+
+3. Link local folder to GitHub repo
+   git remote add origin https://github.com/username/Trust-Vote.git
+
+4. Add all files to Git
+   git add .
+
+5. Commit the changes
+   git commit -m "Initial commit"
+
+6. Push to GitHub
+   git push -u origin master
+
+----------------------------------------
+2. REGULAR WORKFLOW (Updating Code)
+----------------------------------------
+
+After making any code changes:
+
+1. Check file status
+   git status
+
+2. Stage modified files
+   git add .
+
+3. Commit the changes
+   git commit -m "your message here"
+
+4. Push to GitHub
+   git push
+
+----------------------------------------
+3. COMMON COMMANDS (CHEAT SHEET)
+----------------------------------------
+
+# Check repo status
+git status
+
+# See commit history
+git log
+
+# Add a specific file
+git add filename
+
+# Add everything in the folder
+git add .
+
+# Commit with message
+git commit -m "your message"
+
+# Push to remote
+git push
+
+# Pull latest changes
+git pull
+
+# Change the commit message before pushing
+git commit --amend
+
+# Remove a file from staging
+git reset filename
+
+# Remove a file from Git but keep it locally
+git rm --cached filename
+
+# Change remote URL (if repo renamed or moved)
+git remote set-url origin <new-url>
+
+# Switch branches
+git checkout branchname
+
+----------------------------------------
+4. BRANCHING (OPTIONAL BUT USEFUL)
+----------------------------------------
+
+# Create new branch
+git checkout -b new-feature
+
+# Switch to existing branch
+git checkout master
+
+# Merge branch into master
+git checkout master
+git merge new-feature
+
+----------------------------------------
+5. .GITIGNORE TIP
+----------------------------------------
+
+# To avoid pushing unwanted files
+Create a file named .gitignore
+
+Example content:
+node_modules/
+.env
+dist/
+build/
+.DS_Store
+
+----------------------------------------
+6. TROUBLESHOOTING
+----------------------------------------
+
+- Error: "src refspec main does not match any"
+  Fix: Use `master` instead of `main` (or vice-versa) depending on your default branch.
+
+- Warning: "LF will be replaced by CRLF"
+  Safe to ignore on Windows. It’s about line endings.
+
+- Error: "remote origin already exists"
+  Fix: Run 
+  git remote remove origin
+  git remote add origin <url>
+
+----------------------------------------
+
+Always remember:
+➡️  Add → Commit → Push
