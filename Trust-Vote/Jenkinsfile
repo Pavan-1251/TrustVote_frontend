@@ -1,55 +1,145 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: sonar-scanner
+    image: sonarsource/sonar-scanner-cli
+    command:
+    - cat
+    tty: true
+
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command:
+    - cat
+    tty: true
+    securityContext:
+      runAsUser: 0
+      readOnlyRootFilesystem: false
+    env:
+    - name: KUBECONFIG
+      value: /kube/config
+    volumeMounts:
+    - name: kubeconfig-secret
+      mountPath: /kube/config
+      subPath: kubeconfig
+
+  - name: dind
+    image: docker:dind
+    args: ["--registry-mirror=https://mirror.gcr.io", "--storage-driver=overlay2"]
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    volumeMounts:
+    - name: docker-config
+      mountPath: /etc/docker/daemon.json
+      subPath: daemon.json
+
+  volumes:
+  - name: docker-config
+    configMap:
+      name: docker-daemon-config
+  - name: kubeconfig-secret
+    secret:
+      secretName: kubeconfig-secret
+'''
+        }
+    }
 
     environment {
-        // change this to your college nexus docker registry + repo
-        DOCKER_IMAGE = "nexus.yourcollege.ac.in/trustvote-frontend:${env.BUILD_NUMBER}"
+        IMAGE_LOCAL   = "trustvote-frontend:latest"
+        REGISTRY      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+        REGISTRY_PATH = "pavan-project/trustvote-frontend"
+        IMAGE_TAGGED  = "${REGISTRY}/${REGISTRY_PATH}:v${env.BUILD_NUMBER}"
+        SONAR_PROJECT = "2401195_trustvote-frontend"
+        NAMESPACE     = "2401195"
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
 
-        stage('Build frontend (npm)') {
+        stage('Build Docker Image') {
             steps {
-                dir('Trust-Vote/Trust-Vote/client') {
-                    sh 'npm install'
-                    sh 'npm run build'
+                container('dind') {
+                    dir('client') {              // Dockerfile is in client/
+                        sh '''
+                          sleep 15
+                          echo "Building frontend Docker image..."
+                          docker build -t ${IMAGE_LOCAL} .
+                          docker image ls
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Build Docker image') {
+        stage('SonarQube Analysis') {
             steps {
-                dir('Trust-Vote/Trust-Vote/client') {
-                    sh "docker build -t ${DOCKER_IMAGE} ."
+                container('sonar-scanner') {
+                    withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) {
+                        dir('client') {
+                            sh '''
+                              sonar-scanner \
+                                -Dsonar.projectKey='${SONAR_PROJECT}' \
+                                -Dsonar.sources=src \
+                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
+                    }
                 }
             }
         }
 
-        stage('Push image to Nexus') {
+        stage('Login to Docker Registry') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexus-docker-creds',  // create this id in Jenkins
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh "echo $DOCKER_PASS | docker login nexus.yourcollege.ac.in -u $DOCKER_USER --password-stdin"
-                    sh "docker push ${DOCKER_IMAGE}"
+                container('dind') {
+                    // Ask your faculty if they gave you a separate docker username/password;
+                    // for now I'm assuming they will give you a Jenkins credential ID later.
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-docker-2401195',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                          docker --version
+                          sleep 10
+                          echo $DOCKER_PASS | docker login ${REGISTRY} -u $DOCKER_USER --password-stdin
+                        '''
+                    }
                 }
             }
         }
 
-        // Optional: simple deploy by running container on same server
-        stage('Deploy container') {
+        stage('Build - Tag - Push Image') {
             steps {
-                sh """
-                  docker rm -f trustvote-frontend || true
-                  docker run -d --name trustvote-frontend -p 3000:5000 ${DOCKER_IMAGE}
-                """
+                container('dind') {
+                    sh '''
+                      echo "Tagging image as ${IMAGE_TAGGED}"
+                      docker tag ${IMAGE_LOCAL} ${IMAGE_TAGGED}
+                      docker push ${IMAGE_TAGGED}
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Frontend to K8s') {
+            steps {
+                container('kubectl') {
+                    script {
+                        dir('k8s-deployment') {
+                            sh '''
+                              kubectl apply -f trustvote-frontend-deployment.yaml
+                              kubectl rollout status deployment/trustvote-frontend-deployment -n ${NAMESPACE}
+                            '''
+                        }
+                    }
+                }
             }
         }
     }
