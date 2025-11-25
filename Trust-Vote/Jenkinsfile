@@ -5,68 +5,52 @@ pipeline {
 apiVersion: v1
 kind: Pod
 spec:
-  volumes:
-    - name: workspace-volume
-      emptyDir: {}
-    - name: docker-config
-      configMap:
-        name: docker-daemon-config
-    - name: kubeconfig-secret
-      secret:
-        secretName: kubeconfig-secret
-
   containers:
-    - name: sonar-scanner
-      image: sonarsource/sonar-scanner-cli
-      command: ["cat"]
-      tty: true
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /workspace
+  - name: sonar-scanner
+    image: sonarsource/sonar-scanner-cli
+    command: ["cat"]
+    tty: true
 
-    - name: kubectl
-      image: bitnami/kubectl:latest
-      command: ["cat"]
-      tty: true
-      env:
-        - name: KUBECONFIG
-          value: /kube/config
-      securityContext:
-        runAsUser: 0
-        readOnlyRootFilesystem: false
-      volumeMounts:
-        - name: kubeconfig-secret
-          mountPath: /kube/config
-          subPath: kubeconfig
-        - name: workspace-volume
-          mountPath: /workspace
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["cat"]
+    tty: true
+    securityContext:
+      runAsUser: 0
+      readOnlyRootFilesystem: false
+    env:
+    - name: KUBECONFIG
+      value: /kube/config
+    volumeMounts:
+    - name: kubeconfig-secret
+      mountPath: /kube/config
+      subPath: kubeconfig
 
-    - name: dind
-      image: docker:dind
-      securityContext:
-        privileged: true
-      env:
-        - name: DOCKER_TLS_CERTDIR
-          value: ""
-      args: ["--storage-driver=overlay2"]
-      volumeMounts:
-        - name: docker-config
-          mountPath: /etc/docker/daemon.json
-          subPath: daemon.json
-        - name: workspace-volume
-          mountPath: /workspace
+  - name: dind
+    image: docker:dind
+    args: ["--storage-driver=overlay2"]
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    volumeMounts:
+    - name: docker-config
+      mountPath: /etc/docker/daemon.json
+      subPath: daemon.json
 
-    - name: jnlp
-      image: jenkins/inbound-agent:latest
-      volumeMounts:
-        - name: workspace-volume
-          mountPath: /workspace
+  volumes:
+  - name: docker-config
+    configMap:
+      name: docker-daemon-config
+  - name: kubeconfig-secret
+    secret:
+      secretName: kubeconfig-secret
 '''
         }
     }
 
     environment {
-        WS            = "/workspace/agent/workspace/${env.JOB_NAME}"
         IMAGE_LOCAL   = "trustvote-frontend:latest"
         REGISTRY      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
         REGISTRY_PATH = "pavan-project/trustvote-frontend"
@@ -76,19 +60,18 @@ spec:
     }
 
     stages {
-        
+
         stage('Build Docker Image') {
             steps {
                 container('dind') {
-                    sh '''
-                      cd ${WS}/client
-                      echo "Workspace path: ${WS}"
-                      echo "Contents:"
-                      ls -al
-
-                      echo "Building Docker image..."
-                      docker build -t ${IMAGE_LOCAL} .
-                    '''
+                    dir('Trust-Vote/client') {
+                        sh '''
+                          sleep 15
+                          echo "Building frontend Docker image..."
+                          docker build -t ${IMAGE_LOCAL} .
+                          docker image ls
+                        '''
+                    }
                 }
             }
         }
@@ -97,14 +80,15 @@ spec:
             steps {
                 container('sonar-scanner') {
                     withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                          cd ${WS}/client
-                          sonar-scanner \
-                            -Dsonar.projectKey=${SONAR_PROJECT} \
-                            -Dsonar.sources=src \
-                            -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                            -Dsonar.login=$SONAR_TOKEN
-                        '''
+                        dir('Trust-Vote/client') {
+                            sh '''
+                              sonar-scanner \
+                                -Dsonar.projectKey=${SONAR_PROJECT} \
+                                -Dsonar.sources=src \
+                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                                -Dsonar.login=$SONAR_TOKEN
+                            '''
+                        }
                     }
                 }
             }
@@ -126,7 +110,7 @@ spec:
             }
         }
 
-        stage('Push Image') {
+        stage('Build - Tag - Push Image') {
             steps {
                 container('dind') {
                     sh '''
@@ -137,14 +121,15 @@ spec:
             }
         }
 
-        stage('Deploy to K8s') {
+        stage('Deploy Frontend to K8s') {
             steps {
                 container('kubectl') {
-                    sh '''
-                        cd ${WS}/k8s-deployment
-                        kubectl apply -f trustvote-frontend-deployment.yaml
-                        kubectl rollout status deployment/trustvote-frontend-deployment -n ${NAMESPACE}
-                    '''
+                    dir('Trust-Vote/k8s-deployment') {
+                        sh '''
+                          kubectl apply -f trustvote-frontend-deployment.yaml
+                          kubectl rollout status deployment/trustvote-frontend-deployment -n ${NAMESPACE}
+                        '''
+                    }
                 }
             }
         }
