@@ -55,7 +55,7 @@ spec:
         REGISTRY      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
         REGISTRY_PATH = "pavan-project/trustvote-frontend"
         IMAGE_TAGGED  = "${REGISTRY}/${REGISTRY_PATH}:v${env.BUILD_NUMBER}"
-        SONAR_PROJECT = "2401195_trustvote-frontend"
+       SONAR_PROJECT = "TrustVote-Frontend"
         NAMESPACE     = "2401195"
     }
 
@@ -76,23 +76,23 @@ spec:
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                container('sonar-scanner') {
-                    withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) {
-                        dir('Trust-Vote/client') {
-                            sh '''
-                              sonar-scanner \
-                                -Dsonar.projectKey=${SONAR_PROJECT} \
-                                -Dsonar.sources=src \
-                                -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                                -Dsonar.login=$SONAR_TOKEN
-                            '''
-                        }
-                    }
+  stage('SonarQube Analysis') {
+    steps {
+        container('sonar-scanner') {
+            withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) {
+                dir('Trust-Vote/client') {
+                    sh '''
+                        sonar-scanner \
+                            -Dsonar.projectKey=TrustVote-Frontend \
+                            -Dsonar.sources=src \
+                            -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                            -Dsonar.token=$SONAR_TOKEN
+                    '''
                 }
             }
         }
+    }
+}
 
         stage('Login to Docker Registry') {
             steps {
