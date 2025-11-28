@@ -109,9 +109,9 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                      docker tag trustvote-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
-                      docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
-                      docker pull nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
+                      docker tag trustvote-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project/trustvote-frontend:latest
+                      docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project/trustvote-frontend:latest
+                      docker pull nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project/trustvote-frontend:latest
                       docker image ls
                     '''
                 }
