@@ -50,14 +50,7 @@ spec:
         }
     }
 
-    environment {
-        IMAGE_LOCAL   = "trustvote-frontend:latest"
-        REGISTRY      = "nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-        REGISTRY_PATH = "pavan-project/trustvote-frontend"
-        IMAGE_TAGGED  = "${REGISTRY}/${REGISTRY_PATH}:v${env.BUILD_NUMBER}"
-       SONAR_PROJECT = "TrustVote-Frontend"
-        NAMESPACE     = "2401195"
-    }
+    
 
     stages {
 
@@ -68,7 +61,7 @@ spec:
                         sh '''
                           sleep 15
                           echo "Building frontend Docker image..."
-                          docker build -t ${IMAGE_LOCAL} .
+                          docker build -t trustvote-frontend:latest .
                           docker image ls
                         '''
                     }
@@ -76,11 +69,16 @@ spec:
             }
         }
 
-  stage('SonarQube Analysis') {
-    steps {
-        container('sonar-scanner') {
-            withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) {
-                dir('Trust-Vote/client') {
+  stage('SonarQube Analysis') 
+  {
+    steps 
+    {
+        container('sonar-scanner') 
+        {
+            withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) 
+            {
+                dir('Trust-Vote/client') 
+                {
                     sh '''
                         sonar-scanner \
                             -Dsonar.projectKey=TrustVote-Frontend \
@@ -92,30 +90,29 @@ spec:
             }
         }
     }
-}
+  }
 
-        stage('Login to Docker Registry') {
-            steps {
-                container('dind') {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'nexus-docker-2401195',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )]) {
-                        sh '''
-                          echo $DOCKER_PASS | docker login ${REGISTRY} -u $DOCKER_USER --password-stdin
-                        '''
-                    }
-                }
-            }
-        }
+    stage('Login to Docker Registry') 
+    {
+      steps 
+      {
+          container('dind') 
+          {
+            sh 'docker --version'
+            sh 'sleep 10'
+            sh 'docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u admin -p Changeme@2025'
+          }
+      }
+    }
 
         stage('Build - Tag - Push Image') {
             steps {
                 container('dind') {
                     sh '''
-                      docker tag ${IMAGE_LOCAL} ${IMAGE_TAGGED}
-                      docker push ${IMAGE_TAGGED}
+                      docker tag trustvote-frontend:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
+                      docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
+                      docker pull nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/pavan-project:latest
+                      docker image ls
                     '''
                 }
             }
