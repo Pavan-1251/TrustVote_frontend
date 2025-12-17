@@ -75,13 +75,13 @@ spec:
     {
         container('sonar-scanner') 
         {
-            withCredentials([string(credentialsId: 'sonar-token-2401195', variable: 'SONAR_TOKEN')]) 
+            withCredentials([string(credentialsId: 'sonar-token-2401127', variable: 'SONAR_TOKEN')]) 
             {
                 dir('Trust-Vote/client') 
                 {
                     sh '''
                         sonar-scanner \
-                            -Dsonar.projectKey=TrustVote-Frontend \
+                            -Dsonar.projectKey=2401127_TrustVote \
                             -Dsonar.sources=src \
                             -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
                             -Dsonar.token=$SONAR_TOKEN
